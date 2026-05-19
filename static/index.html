@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Credential Vault</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <div id="login-screen" class="screen">
+    <div class="card">
+      <h1>🔐 Credential Vault</h1>
+      <p id="login-prompt">Enter your master password to unlock the vault.</p>
+      <input type="password" id="master-pass" placeholder="Master Password" autofocus>
+      <input type="password" id="master-pass-confirm" placeholder="Confirm master password" style="display:none">
+      <p id="login-error" class="error"></p>
+      <button id="login-btn" onclick="unlock()">Unlock</button>
+    </div>
+  </div>
+  <div id="vault-screen" class="screen hidden">
+    <div class="header">
+      <h1>🔐 Credential Vault</h1>
+      <button class="btn-secondary" onclick="lock()">Lock</button>
+    </div>
+    <div class="toolbar">
+      <button onclick="showAddForm()">+ Add Credential</button>
+      <input type="text" id="search" placeholder="Search services..." oninput="renderList()">
+    </div>
+    <div id="cred-list"></div>
+  </div>
+</div>
+<div id="modal" class="modal hidden">
+  <div class="modal-content">
+    <span class="close" onclick="closeModal()">&times;</span>
+    <h2 id="modal-title">Add Credential</h2>
+    <form id="cred-form">
+      <input type="hidden" id="cred-id">
+      <label>URL</label>
+      <input type="text" id="cred-url" required placeholder="https://example.com">
+      <label>Username</label>
+      <input type="text" id="cred-username">
+      <label>Password</label>
+      <input type="text" id="cred-password">
+      <label><input type="checkbox" id="cred-is-ssh" onchange="toggleSSHPort()"> SSH server</label>
+      <div id="ssh-port-group" style="display:none">
+        <label>Port</label>
+        <input type="number" id="cred-port" value="22" min="1" max="65535">
+      </div>
+      <label>Notes</label>
+      <textarea id="cred-notes" rows="3"></textarea>
+      <button type="submit" id="form-submit">Save</button>
+    </form>
+  </div>
+</div>
+<div id="detail-modal" class="modal hidden" onclick="if(event.target===this)closeDetailModal()">
+  <div class="modal-content detail-content">
+    <span class="close" onclick="closeDetailModal()">&times;</span>
+    <div class="detail-field" id="detail-url-group">
+      <label>URL</label>
+      <div class="detail-row">
+        <a id="detail-url" href="#" target="_blank" style="flex:1;color:#6c63ff;word-break:break-all;font-size:15px;text-decoration:none"></a>
+      </div>
+    </div>
+    <div class="detail-field" id="detail-ssh-group" style="display:none">
+      <label>Host</label>
+      <div class="detail-row">
+        <span id="detail-host" style="flex:1;font-size:15px;word-break:break-all"></span>
+        <span id="detail-port" style="color:#888;font-size:13px;margin-left:8px"></span>
+      </div>
+    </div>
+    <div class="detail-field">
+      <label>Username</label>
+      <div class="detail-row">
+        <span id="detail-username"></span>
+        <button class="icon-btn" onclick="copyField('detail-username', 'Username')">📋</button>
+      </div>
+    </div>
+    <div class="detail-field">
+      <label>Password</label>
+      <div class="detail-row">
+        <input type="hidden" id="detail-password-real">
+        <span id="detail-password" class="password-masked">••••••••</span>
+        <button class="icon-btn" onclick="togglePassword()" id="toggle-pw-btn">👁</button>
+        <button class="icon-btn" onclick="copyField('detail-password-real', 'Password')">📋</button>
+      </div>
+    </div>
+    <div class="detail-field">
+      <label>Notes</label>
+      <p id="detail-notes" class="detail-notes"></p>
+    </div>
+    <div class="detail-actions">
+      <button onclick="openFromDetail()" style="background:#2a7a2a;" id="detail-open-btn">Open & Fill</button>
+      <button onclick="connectFromDetail()" style="background:#1a6b3c;" id="detail-connect-btn">Connect SSH</button>
+      <button onclick="editFromDetail()">Edit</button>
+      <button onclick="deleteFromDetail()" style="background:#ff4444;">Delete</button>
+    </div>
+  </div>
+</div>
+<div id="toast" class="toast hidden"></div>
+<script src="app.js"></script>
+</body>
+</html>
