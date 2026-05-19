@@ -130,6 +130,7 @@ func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
 		Port     int    `json:"port"`
 		Username string `json:"username"`
 		Password string `json:"password"`
+		KeyFile  string `json:"key_file"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
@@ -143,15 +144,20 @@ func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
 		req.Port = 22
 	}
 
+	identityArg := ""
+	if req.KeyFile != "" {
+		identityArg = fmt.Sprintf(`-i "%s"`, req.KeyFile)
+	}
+
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no -p %d %s@%s", req.Port, req.Username, req.Host)
+		sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no %s -p %d %s@%s", identityArg, req.Port, req.Username, req.Host)
 		psScript := fmt.Sprintf(
-			`Set-Clipboard -Value "%s"; Start-Process -WindowStyle Normal -FilePath "cmd" -ArgumentList "/k", "%s"`,
+			`$pass = "%s"; if ($pass) { Set-Clipboard -Value $pass }; Start-Process -WindowStyle Normal -FilePath "cmd" -ArgumentList "/k", "%s"`,
 			req.Password, sshCmd)
 		cmd = exec.Command("powershell", "-Command", psScript)
 	} else {
-		sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no -p %d %s@%s", req.Port, req.Username, req.Host)
+		sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no %s -p %d %s@%s", identityArg, req.Port, req.Username, req.Host)
 		var termCmd string
 		if _, err := exec.LookPath("x-terminal-emulator"); err == nil {
 			termCmd = fmt.Sprintf("x-terminal-emulator -e bash -c '%s; exec bash'", sshCmd)
@@ -163,8 +169,11 @@ func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(statusResponse{Status: "error", Message: "no terminal emulator found"})
 			return
 		}
-		shellCmd := fmt.Sprintf("echo -n '%s' | pbcopy 2>/dev/null || echo -n '%s' | xclip -selection clipboard 2>/dev/null; %s",
-			req.Password, req.Password, termCmd)
+		copyCmd := ""
+		if req.Password != "" {
+			copyCmd = fmt.Sprintf("echo -n '%s' | pbcopy 2>/dev/null || echo -n '%s' | xclip -selection clipboard 2>/dev/null; ", req.Password, req.Password)
+		}
+		shellCmd := copyCmd + termCmd
 		cmd = exec.Command("bash", "-c", shellCmd)
 	}
 
@@ -172,7 +181,13 @@ func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(statusResponse{Status: "error", Message: err.Error()})
 		return
 	}
-	json.NewEncoder(w).Encode(statusResponse{Status: "ok", Message: "password copied — paste it in the terminal"})
+	msg := "Terminal opened"
+	if req.KeyFile != "" {
+		msg = "Connecting with key file"
+	} else if req.Password != "" {
+		msg = "Password copied — paste it in the terminal"
+	}
+	json.NewEncoder(w).Encode(statusResponse{Status: "ok", Message: msg})
 }
 
 func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {

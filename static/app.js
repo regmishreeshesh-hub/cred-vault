@@ -130,7 +130,7 @@ async function viewCredential(id) {
   document.getElementById('detail-connect-btn').style.display = isSSH ? '' : 'none';
   if (isSSH) {
     document.getElementById('detail-host').textContent = c.url;
-    document.getElementById('detail-port').textContent = 'port ' + c.port;
+    document.getElementById('detail-port').textContent = 'port ' + c.port + (c.key_file ? ' · key: ' + c.key_file : '');
   }
   document.getElementById('detail-url').textContent = c.url;
   document.getElementById('detail-url').href = normalizeURL(c.url);
@@ -210,11 +210,11 @@ async function connectSSH(id) {
   const { host, port } = getHostPort(c);
   const res = await api('/api/connect', {
     method: 'POST',
-    body: JSON.stringify({ host, port, username: c.username, password: c.password }),
+    body: JSON.stringify({ host, port, username: c.username, password: c.password, key_file: c.key_file || '' }),
   });
   if (btn) btn.disabled = false;
   if (res && res.status === 'ok') {
-    showToast(res.message || 'Password copied — paste it in the terminal');
+    showToast(res.message || 'Connecting...');
   } else if (res) {
     showToast('Connection failed: ' + (res.message || 'unknown error'));
   }
@@ -253,6 +253,7 @@ function showAddForm() {
   document.getElementById('cred-username').value = '';
   document.getElementById('cred-password').value = '';
   document.getElementById('cred-port').value = '22';
+  document.getElementById('cred-key-file').value = '';
   document.getElementById('cred-is-ssh').checked = false;
   document.getElementById('ssh-port-group').style.display = 'none';
   document.getElementById('cred-notes').value = '';
@@ -271,6 +272,7 @@ async function showEditForm(id) {
   document.getElementById('cred-username').value = c.username;
   document.getElementById('cred-password').value = c.password;
   document.getElementById('cred-port').value = c.port || 22;
+  document.getElementById('cred-key-file').value = c.key_file || '';
   document.getElementById('cred-is-ssh').checked = !!c.port;
   document.getElementById('ssh-port-group').style.display = c.port ? '' : 'none';
   document.getElementById('cred-notes').value = c.notes;
@@ -290,6 +292,7 @@ document.getElementById('cred-form').addEventListener('submit', async (e) => {
     username: document.getElementById('cred-username').value,
     password: document.getElementById('cred-password').value,
     port: document.getElementById('cred-is-ssh').checked ? parseInt(document.getElementById('cred-port').value) || 22 : 0,
+    key_file: document.getElementById('cred-is-ssh').checked ? document.getElementById('cred-key-file').value : '',
     notes: document.getElementById('cred-notes').value,
   };
   if (id) {

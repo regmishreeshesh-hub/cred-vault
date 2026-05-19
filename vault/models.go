@@ -6,6 +6,7 @@ type Credential struct {
 	Username  string `json:"username"`
 	Password  string `json:"password"`
 	Port      int    `json:"port"`
+	KeyFile   string `json:"key_file"`
 	Notes     string `json:"notes"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
