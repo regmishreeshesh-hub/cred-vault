@@ -26,6 +26,28 @@
     <div class="toolbar">
       <button onclick="showAddForm()">+ Add Credential</button>
       <input type="text" id="search" placeholder="Search services..." oninput="renderList()">
+      <button class="btn-secondary" onclick="showBookmarkletModal()">⚡ Autofill</button>
+      <div class="settings-group">
+        <label title="Auto-lock after inactivity">⏱ Auto-lock:
+          <select id="auto-lock-timeout" onchange="updateAutoLock()">
+            <option value="0">Off</option>
+            <option value="5">5 min</option>
+            <option value="10" selected>10 min</option>
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="60">60 min</option>
+          </select>
+        </label>
+        <label title="Clear clipboard after copying">📋 Clipboard clear:
+          <select id="clipboard-timeout" onchange="updateClipboardTimeout()">
+            <option value="0">Off</option>
+            <option value="10">10 sec</option>
+            <option value="15" selected>15 sec</option>
+            <option value="30">30 sec</option>
+            <option value="60">60 sec</option>
+          </select>
+        </label>
+      </div>
     </div>
     <div id="cred-list"></div>
   </div>
@@ -144,6 +166,24 @@
       <button onclick="editFromDetail()">Edit</button>
       <button onclick="deleteFromDetail()" style="background:#ff4444;">Delete</button>
     </div>
+  </div>
+</div>
+<div id="bookmarklet-modal" class="modal hidden" onclick="if(event.target===this)closeBookmarkletModal()">
+  <div class="modal-content">
+    <span class="close" onclick="closeBookmarkletModal()">&times;</span>
+    <h2>⚡ Autofill Bookmarklet</h2>
+    <p style="color:#888;font-size:13px;margin-bottom:16px;">Drag this button to your bookmarks bar. Then click it on any login page to auto-fill credentials.</p>
+    <div class="bookmarklet-link-wrap">
+      <a id="bookmarklet-link" href="#" class="bookmarklet-link" onclick="event.preventDefault()">🔐 Vault Autofill</a>
+    </div>
+    <p style="color:#888;font-size:12px;margin-top:16px;">How it works:</p>
+    <ol style="color:#888;font-size:12px;padding-left:20px;margin-top:6px;">
+      <li>Add web credentials with the site URL (e.g. github.com)</li>
+      <li>Drag the button above to your bookmarks bar</li>
+      <li>Visit a login page and click the bookmark</li>
+      <li>Username & password will be filled automatically</li>
+    </ol>
+    <p style="color:#666;font-size:11px;margin-top:12px;">The vault must be running and unlocked. Bookmarklet connects to localhost only.</p>
   </div>
 </div>
 <div id="toast" class="toast hidden"></div>

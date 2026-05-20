@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -188,6 +189,42 @@ func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
 		msg = "Password copied — paste it in the terminal"
 	}
 	json.NewEncoder(w).Encode(statusResponse{Status: "ok", Message: msg})
+}
+
+func (h *Handler) Lookup(w http.ResponseWriter, r *http.Request) {
+	domain := r.URL.Query().Get("domain")
+	if domain == "" {
+		http.Error(w, "domain required", http.StatusBadRequest)
+		return
+	}
+	domain = strings.ToLower(domain)
+	creds := h.Vault.List()
+	var matches []vault.Credential
+	for _, c := range creds {
+		if c.Type != "web" && c.Type != "" {
+			continue
+		}
+		credURL := strings.ToLower(c.URL)
+		if credURL == "" {
+			continue
+		}
+		// Extract hostname from credential URL
+		credDomain := credURL
+		if strings.Contains(credURL, "://") {
+			if u, err := url.Parse(credURL); err == nil {
+				credDomain = u.Hostname()
+			}
+		}
+		credDomain = strings.TrimPrefix(credDomain, "www.")
+		d := strings.TrimPrefix(domain, "www.")
+		if credDomain == d || strings.HasSuffix(credDomain, "."+d) || strings.HasSuffix(d, "."+credDomain) {
+			matches = append(matches, c)
+		}
+	}
+	if matches == nil {
+		matches = []vault.Credential{}
+	}
+	json.NewEncoder(w).Encode(matches)
 }
 
 func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {

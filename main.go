@@ -42,6 +42,7 @@ func main() {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	}))
+	mux.HandleFunc("/api/lookup", h.Middleware(h.Lookup))
 	mux.HandleFunc("/api/credentials/", h.Middleware(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case "PUT":

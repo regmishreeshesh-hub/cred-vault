@@ -15,9 +15,12 @@ button:hover { background: #5a52e0; }
 .error { color: #ff6b6b; font-size: 13px; }
 .header { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 20px; }
 .header h1 { font-size: 20px; }
-.toolbar { display: flex; gap: 10px; width: 100%; margin-bottom: 20px; }
+.toolbar { display: flex; gap: 10px; width: 100%; margin-bottom: 20px; flex-wrap: wrap; }
 .toolbar button { width: auto; white-space: nowrap; }
-.toolbar input { flex: 1; }
+.toolbar input { flex: 1; min-width: 150px; }
+.settings-group { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.settings-group label { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #888; white-space: nowrap; margin: 0; }
+.settings-group select { width: auto; padding: 4px 8px; margin: 0; font-size: 12px; background: #252540; border: 1px solid #333; border-radius: 6px; color: #e0e0e0; }
 #cred-list { width: 100%; }
 .cred-item { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 8px; padding: 16px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
 .cred-item .info { flex: 1; }
@@ -46,3 +49,6 @@ button:hover { background: #5a52e0; }
 .detail-actions button { margin: 0; }
 .password-masked { font-family: monospace; letter-spacing: 2px; font-size: 18px !important; }
 @keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+.bookmarklet-link-wrap { text-align: center; padding: 20px; background: #252540; border-radius: 8px; border: 1px dashed #444; }
+.bookmarklet-link { display: inline-block; padding: 10px 24px; background: #6c63ff; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: grab; }
+.bookmarklet-link:hover { background: #5a52e0; }

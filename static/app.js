@@ -1,5 +1,64 @@
 const API = '';
 
+// Auto-lock timer
+let autoLockTimer = null;
+let autoLockMinutes = 10;
+
+// Clipboard auto-clear
+let clipboardClearMs = 15000;
+
+function loadSettings() {
+  const savedLock = localStorage.getItem('cred-vault-auto-lock');
+  const savedClip = localStorage.getItem('cred-vault-clipboard-timeout');
+  if (savedLock !== null) {
+    autoLockMinutes = parseInt(savedLock);
+    const el = document.getElementById('auto-lock-timeout');
+    if (el) el.value = savedLock;
+  }
+  if (savedClip !== null) {
+    clipboardClearMs = parseInt(savedClip) * 1000;
+    const el = document.getElementById('clipboard-timeout');
+    if (el) el.value = savedClip;
+  }
+}
+
+function updateAutoLock() {
+  autoLockMinutes = parseInt(document.getElementById('auto-lock-timeout').value);
+  localStorage.setItem('cred-vault-auto-lock', autoLockMinutes);
+  resetAutoLockTimer();
+}
+
+function updateClipboardTimeout() {
+  const sec = parseInt(document.getElementById('clipboard-timeout').value);
+  clipboardClearMs = sec * 1000;
+  localStorage.setItem('cred-vault-clipboard-timeout', sec);
+}
+
+function resetAutoLockTimer() {
+  if (autoLockTimer) clearTimeout(autoLockTimer);
+  if (autoLockMinutes > 0) {
+    autoLockTimer = setTimeout(() => lock(), autoLockMinutes * 60 * 1000);
+  }
+}
+
+function setupInactivityListeners() {
+  const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+  events.forEach(e => document.addEventListener(e, resetAutoLockTimer, { passive: true }));
+}
+
+function secureCopy(text, label) {
+  navigator.clipboard.writeText(text).then(() => {
+    showToast(label + ' copied to clipboard');
+    if (clipboardClearMs > 0) {
+      setTimeout(() => {
+        navigator.clipboard.writeText('').catch(() => {});
+      }, clipboardClearMs);
+    }
+  }).catch(() => {
+    showToast('Failed to copy');
+  });
+}
+
 async function api(path, options = {}) {
   const res = await fetch(API + path, {
     headers: { 'Content-Type': 'application/json' },
@@ -38,6 +97,8 @@ async function unlock() {
 }
 
 async function lock() {
+  if (autoLockTimer) clearTimeout(autoLockTimer);
+  autoLockTimer = null;
   await api('/api/lock', { method: 'POST' });
   document.getElementById('master-pass').value = '';
   showLogin(false);
@@ -68,6 +129,8 @@ function showLogin(firstRun) {
 function showVault() {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('vault-screen').classList.remove('hidden');
+  loadSettings();
+  resetAutoLockTimer();
 }
 
 function credLabel(c) {
@@ -131,9 +194,7 @@ async function openURL(id) {
   const c = creds.find(x => x.id === id);
   if (!c || !c.url) return;
   window.open(normalizeURL(c.url), '_blank');
-  navigator.clipboard.writeText(c.username).then(() => {
-    showToast('Opening URL · Username copied to clipboard');
-  }).catch(() => {});
+  secureCopy(c.username, 'Username');
 }
 
 async function copyIAM(id) {
@@ -142,9 +203,7 @@ async function copyIAM(id) {
   const c = creds.find(x => x.id === id);
   if (!c) return;
   const text = 'Access Key: ' + (c.password || '') + '\nSecret Key: ' + (c.secret_key || '');
-  navigator.clipboard.writeText(text).then(() => {
-    showToast('Access Key and Secret Key copied');
-  }).catch(() => {});
+  secureCopy(text, 'Access Key and Secret Key');
 }
 
 let detailCredId = null;
@@ -234,11 +293,7 @@ function toggleSecret() {
 function copyField(elementId, label) {
   const el = document.getElementById(elementId);
   const text = el.tagName === 'INPUT' ? el.value : el.textContent;
-  navigator.clipboard.writeText(text === '(not set)' || text === '(empty)' ? '' : text).then(() => {
-    showToast(label + ' copied to clipboard');
-  }).catch(() => {
-    showToast('Failed to copy');
-  });
+  secureCopy(text === '(not set)' || text === '(empty)' ? '' : text, label);
 }
 
 async function editFromDetail() {
@@ -295,12 +350,8 @@ async function openFromDetail() {
   const c = creds.find(x => x.id === detailCredId);
   if (!c || !c.url) return;
   window.open(normalizeURL(c.url), '_blank');
-  navigator.clipboard.writeText(c.username).then(() => {
-    closeDetailModal();
-    showToast('Opened URL · Username copied, paste into the login field');
-  }).catch(() => {
-    closeDetailModal();
-  });
+  secureCopy(c.username, 'Username');
+  closeDetailModal();
 }
 
 function toggleCredType() {
@@ -435,6 +486,50 @@ function showToast(msg) {
   setTimeout(() => t.classList.add('hidden'), 2000);
 }
 
+function showBookmarkletModal() {
+  const port = location.port || '9090';
+  const host = location.hostname || '127.0.0.1';
+  const base = 'http://' + host + ':' + port;
+  const code = `(function(){
+    var d=location.hostname.replace(/^www\\./,'');
+    fetch('${base}/api/lookup?domain='+encodeURIComponent(d),{headers:{'Content-Type':'application/json'}})
+    .then(function(r){return r.json()})
+    .then(function(creds){
+      if(!creds||!creds.length){alert('No credentials found for '+d);return}
+      var c=creds[0];
+      function fill(sel,val){
+        var els=document.querySelectorAll(sel);
+        for(var i=0;i<els.length;i++){
+          var el=els[i];
+          if(el.offsetParent!==null){
+            var nativeSet=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+            nativeSet.call(el,val);
+            el.dispatchEvent(new Event('input',{bubbles:true}));
+            el.dispatchEvent(new Event('change',{bubbles:true}));
+            return true;
+          }
+        }
+        return false;
+      }
+      var filled=false;
+      if(c.username){filled=fill('input[type="email"],input[type="text"],input[name*="user"],input[name*="email"],input[name*="login"],input[id*="user"],input[id*="email"],input[id*="login"],input[autocomplete="username"]',c.username)}
+      if(c.password){fill('input[type="password"],input[name*="pass"],input[id*="pass"],input[autocomplete="current-password"]',c.password)}
+      var msg='Vault: filled '+(c.username?'username':'')+(c.username&&c.password?' and ':'')+(c.password?'password':'')+' for '+d;
+      var t=document.createElement('div');t.textContent=msg;
+      t.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#e0e0e0;border:1px solid #6c63ff;padding:10px 20px;border-radius:8px;z-index:999999;font:14px sans-serif;';
+      document.body.appendChild(t);setTimeout(function(){t.remove()},3000);
+    })
+    .catch(function(){alert('Could not connect to vault. Make sure it is running and unlocked.')});
+  })()`;
+  const bookmarklet = 'javascript:' + encodeURIComponent(code);
+  document.getElementById('bookmarklet-link').href = bookmarklet;
+  document.getElementById('bookmarklet-modal').classList.remove('hidden');
+}
+
+function closeBookmarkletModal() {
+  document.getElementById('bookmarklet-modal').classList.add('hidden');
+}
+
 async function checkStatus() {
   const res = await api('/api/status');
   if (res && !res.locked) {
@@ -444,5 +539,7 @@ async function checkStatus() {
     showLogin(res.first_run);
   }
 }
+loadSettings();
+setupInactivityListeners();
 checkStatus();
 document.getElementById('master-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') unlock(); });
