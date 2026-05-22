@@ -25,7 +25,14 @@
     </div>
     <div class="toolbar">
       <button onclick="showAddForm()">+ Add Credential</button>
-      <input type="text" id="search" placeholder="Search services..." oninput="renderList()">
+      <select id="type-filter" onchange="renderList()">
+        <option value="">All Types</option>
+        <option value="general">📄 General</option>
+        <option value="web">🌐 Web Login</option>
+        <option value="ssh">🖥 SSH Server</option>
+        <option value="iam">🔑 IAM User</option>
+      </select>
+      <input type="text" id="search" placeholder="Search name, URL, description..." oninput="renderList()">
       <button class="btn-secondary" onclick="showBookmarkletModal()">⚡ Autofill</button>
       <div class="settings-group">
         <label title="Auto-lock after inactivity">⏱ Auto-lock:
@@ -65,6 +72,9 @@
         <option value="ssh">SSH Server</option>
         <option value="iam">IAM User</option>
       </select>
+      <label>Title <span class="field-hint">(visible at the top of the list item)</span></label>
+      <input type="text" id="cred-title" placeholder="e.g. Production GitHub, Dev AWS, Home server">
+      <input type="hidden" id="cred-notes">
       <div id="general-fields">
         <label>Name</label>
         <input type="text" id="cred-name" placeholder="My API Key, Database, etc.">
@@ -81,20 +91,39 @@
         <label>Password</label>
         <input type="text" id="cred-password">
       </div>
-      <div id="ssh-fields" style="display:none">
-        <label>Host</label>
-        <input type="text" id="cred-host" placeholder="192.168.1.1 or server.example.com">
-        <label>Port</label>
-        <input type="number" id="cred-port" value="22" min="1" max="65535">
-        <label>Username</label>
-        <input type="text" id="cred-ssh-user">
-        <label>Password (optional if using key)</label>
-        <input type="text" id="cred-ssh-pass">
-        <label>Key File (optional)</label>
-        <input type="text" id="cred-key-file" placeholder="/path/to/key.pem">
+      <div id="ssh-fields" style="display:none" class="form-grid">
+        <div><label>Host <span class="field-hint">(for SSH connection)</span></label>
+        <input type="text" id="cred-host" placeholder="192.168.1.1 or server.example.com"></div>
+        <div><label>Port</label>
+        <input type="number" id="cred-port" value="22" min="1" max="65535"></div>
+        <div><label>Username</label>
+        <input type="text" id="cred-ssh-user"></div>
+        <div><label>Password <span class="field-hint">(optional if using key)</span></label>
+        <input type="text" id="cred-ssh-pass"></div>
+        <div class="full-width"><label>Key File <span class="field-hint">(optional)</span></label>
+        <input type="text" id="cred-key-file" placeholder="/path/to/key.pem"></div>
+        <hr class="field-divider full-width">
+        <div><label>Service</label>
+        <input type="text" id="cred-service" placeholder="e.g. AWS, Azure, GCP, DigitalOcean"></div>
+        <div><label>Instance Name</label>
+        <input type="text" id="cred-instance" placeholder="e.g. web-prod-01, db-primary"></div>
+        <div><label>URL <span class="field-hint">(web console link)</span></label>
+        <input type="text" id="cred-url-ssh" placeholder="https://console.aws.amazon.com/ec2/..."></div>
+        <div><label>Public IP</label>
+        <input type="text" id="cred-public-ip" placeholder="e.g. 203.0.113.10"></div>
+        <div><label>AWS Account</label>
+        <input type="text" id="cred-aws-account" placeholder="e.g. Ipay, Prod, Dev"></div>
+        <div><label>AWS Region</label>
+        <input type="text" id="cred-aws-region" placeholder="e.g. ap-southeast-1, us-east-1"></div>
+        <div><label>OS/Service</label>
+        <input type="text" id="cred-os-service" placeholder="e.g. Windows/IIS, Ubuntu/nginx"></div>
+        <div class="full-width"><label>SSH</label>
+        <textarea id="cred-ssh-col" rows="2" placeholder="SSH connection string or method"></textarea></div>
+        <div class="full-width"><label>Remarks</label>
+        <textarea id="cred-remarks" rows="2" placeholder="Any additional notes about this server"></textarea></div>
       </div>
       <div id="iam-fields" style="display:none">
-        <label>Description</label>
+        <label>Account Description</label>
         <input type="text" id="cred-iam-desc" placeholder="Dev AWS account">
         <label>IAM User</label>
         <input type="text" id="cred-iam-user">
@@ -103,8 +132,8 @@
         <label>Secret Access Key</label>
         <input type="text" id="cred-secret-key">
       </div>
-      <label>Notes</label>
-      <textarea id="cred-notes" rows="3"></textarea>
+      <label>Description <span class="field-hint">(visible at the bottom of the list item)</span></label>
+      <textarea id="cred-description" rows="3" placeholder="Add context, ownership, environment, or usage notes"></textarea>
       <button type="submit" id="form-submit">Save</button>
     </form>
   </div>
@@ -123,6 +152,38 @@
       <div class="detail-row">
         <span id="detail-host" style="flex:1;font-size:15px;word-break:break-all"></span>
         <span id="detail-port" style="color:#888;font-size:13px;margin-left:8px"></span>
+      </div>
+      <div class="detail-field" id="detail-ssh-info-service" style="margin-top:8px">
+        <label>Service</label>
+        <div class="detail-row"><span id="detail-ssh-service"></span></div>
+      </div>
+      <div class="detail-field" id="detail-ssh-info-instance">
+        <label>Instance Name</label>
+        <div class="detail-row"><span id="detail-ssh-instance"></span></div>
+      </div>
+      <div class="detail-field" id="detail-ssh-info-public-ip">
+        <label>Public IP</label>
+        <div class="detail-row"><span id="detail-ssh-public-ip"></span></div>
+      </div>
+      <div class="detail-field" id="detail-ssh-info-aws-account">
+        <label>AWS Account</label>
+        <div class="detail-row"><span id="detail-ssh-aws-account"></span></div>
+      </div>
+      <div class="detail-field" id="detail-ssh-info-aws-region">
+        <label>AWS Region</label>
+        <div class="detail-row"><span id="detail-ssh-aws-region"></span></div>
+      </div>
+      <div class="detail-field" id="detail-ssh-info-os-service">
+        <label>OS/Service</label>
+        <div class="detail-row"><span id="detail-ssh-os-service"></span></div>
+      </div>
+      <div class="detail-field" id="detail-ssh-info-ssh-col">
+        <label>SSH</label>
+        <div class="detail-row"><span id="detail-ssh-ssh-col" class="detail-notes"></span></div>
+      </div>
+      <div class="detail-field" id="detail-ssh-info-remarks">
+        <label>Remarks</label>
+        <div class="detail-row"><span id="detail-ssh-remarks" class="detail-notes"></span></div>
       </div>
     </div>
     <div class="detail-field" id="detail-iam-group" style="display:none">
@@ -157,7 +218,7 @@
       </div>
     </div>
     <div class="detail-field">
-      <label>Notes</label>
+      <label>Description</label>
       <p id="detail-notes" class="detail-notes"></p>
     </div>
     <div class="detail-actions">
