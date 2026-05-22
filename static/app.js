@@ -1,5 +1,16 @@
 const API = '';
 
+function togglePw(id, btn) {
+  const el = document.getElementById(id);
+  if (el.type === 'password') {
+    el.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    el.type = 'password';
+    btn.textContent = '👁';
+  }
+}
+
 // Auto-lock timer
 let autoLockTimer = null;
 let autoLockMinutes = 10;

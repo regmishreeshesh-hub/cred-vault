@@ -81,7 +81,7 @@
         <label>Identifier</label>
         <input type="text" id="cred-identifier" placeholder="username, client ID, email">
         <label>Secret</label>
-        <input type="text" id="cred-secret" placeholder="password, token, API key">
+        <div class="pw-field"><input type="password" id="cred-secret" placeholder="password, token, API key"><button type="button" class="pw-toggle" onclick="togglePw('cred-secret',this)" tabindex="-1">👁</button></div>
       </div>
       <div id="web-fields" style="display:none">
         <label>URL</label>
@@ -89,7 +89,7 @@
         <label>Username</label>
         <input type="text" id="cred-username">
         <label>Password</label>
-        <input type="text" id="cred-password">
+        <div class="pw-field"><input type="password" id="cred-password"><button type="button" class="pw-toggle" onclick="togglePw('cred-password',this)" tabindex="-1">👁</button></div>
       </div>
       <div id="ssh-fields" style="display:none" class="form-grid">
         <div><label>Host <span class="field-hint">(for SSH connection)</span></label>
@@ -99,7 +99,7 @@
         <div><label>Username</label>
         <input type="text" id="cred-ssh-user"></div>
         <div><label>Password <span class="field-hint">(optional if using key)</span></label>
-        <input type="text" id="cred-ssh-pass"></div>
+        <div class="pw-field"><input type="password" id="cred-ssh-pass"><button type="button" class="pw-toggle" onclick="togglePw('cred-ssh-pass',this)" tabindex="-1">👁</button></div></div>
         <div class="full-width"><label>Key File <span class="field-hint">(optional)</span></label>
         <input type="text" id="cred-key-file" placeholder="/path/to/key.pem"></div>
         <hr class="field-divider full-width">
@@ -128,9 +128,9 @@
         <label>IAM User</label>
         <input type="text" id="cred-iam-user">
         <label>Access Key ID</label>
-        <input type="text" id="cred-access-key">
+        <div class="pw-field"><input type="password" id="cred-access-key"><button type="button" class="pw-toggle" onclick="togglePw('cred-access-key',this)" tabindex="-1">👁</button></div>
         <label>Secret Access Key</label>
-        <input type="text" id="cred-secret-key">
+        <div class="pw-field"><input type="password" id="cred-secret-key"><button type="button" class="pw-toggle" onclick="togglePw('cred-secret-key',this)" tabindex="-1">👁</button></div>
       </div>
       <label>Description <span class="field-hint">(visible at the bottom of the list item)</span></label>
       <textarea id="cred-description" rows="3" placeholder="Add context, ownership, environment, or usage notes"></textarea>
