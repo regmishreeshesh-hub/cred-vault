@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -147,15 +148,29 @@ func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
 
 	identityArg := ""
 	if req.KeyFile != "" {
+		if _, err := os.Stat(req.KeyFile); os.IsNotExist(err) {
+			json.NewEncoder(w).Encode(statusResponse{Status: "error", Message: "key file not found: " + req.KeyFile})
+			return
+		}
 		identityArg = fmt.Sprintf(`-i "%s"`, req.KeyFile)
 	}
 
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no %s -p %d %s@%s", identityArg, req.Port, req.Username, req.Host)
-		psScript := fmt.Sprintf(
-			`$pass = "%s"; if ($pass) { Set-Clipboard -Value $pass }; Start-Process -WindowStyle Normal -FilePath "cmd" -ArgumentList "/k", "%s"`,
-			req.Password, sshCmd)
+		args := []string{"/k", "ssh", "-v", "-o", "StrictHostKeyChecking=no"}
+		if req.KeyFile != "" {
+			args = append(args, "-i", req.KeyFile)
+		}
+		args = append(args, "-p", fmt.Sprintf("%d", req.Port), fmt.Sprintf("%s@%s", req.Username, req.Host))
+		var quoted []string
+		for _, a := range args {
+			quoted = append(quoted, `"`+a+`"`)
+		}
+		psScript := fmt.Sprintf(`Start-Process -WindowStyle Normal -FilePath "cmd" -ArgumentList @(%s)`, strings.Join(quoted, ","))
+		if req.Password != "" {
+			escaped := strings.ReplaceAll(req.Password, "'", "''")
+			psScript = fmt.Sprintf(`Set-Clipboard -Value '%s'; %s`, escaped, psScript)
+		}
 		cmd = exec.Command("powershell", "-Command", psScript)
 	} else {
 		sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no %s -p %d %s@%s", identityArg, req.Port, req.Username, req.Host)
