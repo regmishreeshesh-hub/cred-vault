@@ -1,0 +1,22 @@
+# Built application binaries
+/cred-vault
+/cred-vault.exe
+/cred-vault.exe~
+/cred-vault-linux
+
+# Local credential vault data
+/vault.json
+
+# Common compiled binary artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+
+# Build output directories
+/bin/
+/dist/
+
+# Test and coverage output
+coverage.out
