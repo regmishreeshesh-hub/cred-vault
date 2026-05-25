@@ -2,7 +2,7 @@
 /cred-vault
 /cred-vault.exe
 /cred-vault.exe~
-/cred-vault-linux
+#/cred-vault-linux
 
 # Local credential vault data
 /vault.json
