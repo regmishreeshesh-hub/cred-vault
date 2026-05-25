@@ -1,9 +1,3 @@
-# Built application binaries
-/cred-vault
-/cred-vault.exe
-/cred-vault.exe~
-#/cred-vault-linux
-
 # Local credential vault data
 /vault.json
 
