@@ -17,6 +17,7 @@ let autoLockMinutes = 10;
 
 // Clipboard auto-clear
 let clipboardClearMs = 15000;
+let currentCreds = [];
 
 function loadSettings() {
   const savedLock = localStorage.getItem('cred-vault-auto-lock');
@@ -57,17 +58,42 @@ function setupInactivityListeners() {
   events.forEach(e => document.addEventListener(e, resetAutoLockTimer, { passive: true }));
 }
 
-function secureCopy(text, label) {
-  navigator.clipboard.writeText(text).then(() => {
+async function secureCopy(text, label) {
+  try {
+    await navigator.clipboard.writeText(text);
     showToast(label + ' copied to clipboard');
     if (clipboardClearMs > 0) {
       setTimeout(() => {
         navigator.clipboard.writeText('').catch(() => {});
       }, clipboardClearMs);
     }
-  }).catch(() => {
+    return true;
+  } catch (e) {
+    // Fallback for browsers that don't support navigator.clipboard
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      if (successful) {
+        showToast(label + ' copied to clipboard');
+        if (clipboardClearMs > 0) {
+          setTimeout(() => {
+            navigator.clipboard.writeText('').catch(() => {});
+          }, clipboardClearMs);
+        }
+        return true;
+      }
+    } catch (fallbackErr) {
+      // ignore
+    }
     showToast('Failed to copy');
-  });
+    return false;
+  }
 }
 
 async function api(path, options = {}) {
@@ -182,6 +208,7 @@ function typeIcon(c) {
 async function renderList() {
   const creds = await api('/api/credentials');
   if (!creds) return;
+  currentCreds = creds;
   const search = document.getElementById('search').value.toLowerCase();
   const typeFilter = document.getElementById('type-filter').value;
   const filtered = creds.filter(c => {
@@ -215,7 +242,7 @@ async function renderList() {
           ${credDesc(c) ? `<div class="desc">${esc(credDesc(c))}</div>` : ''}
         </div>
         <div class="actions" onclick="event.stopPropagation()">
-          ${c.type === 'ssh' ? `<button data-connect-id="${c.id}" onclick="connectSSH('${c.id}')" style="background:#1a6b3c;">Connect</button>` : c.type === 'iam' ? `<button onclick="copyIAM('${c.id}')" style="background:#b8860b;">Copy Keys</button>` : c.type === 'web' ? `<button onclick="openURL('${c.id}')">Open</button>` : ''}
+          ${c.type === 'ssh' ? `<button data-connect-id="${c.id}" onclick="connectSSH('${c.id}')" style="background:#1a6b3c;">Connect</button>` : c.type === 'iam' ? `<button onclick="copyIAM('${c.id}')" style="background:#b8860b;">Copy Keys</button>` : c.type === 'web' ? `<button onclick="openURL('${c.id}')">Open & Copy</button>` : ''}
           <button onclick="showEditForm('${c.id}')">Edit</button>
           <button onclick="deleteCred('${c.id}')" style="background:#ff4444;">Del</button>
         </div>
@@ -231,19 +258,30 @@ function normalizeURL(url) {
   return url;
 }
 
-async function openURL(id) {
-  const creds = await api('/api/credentials');
-  if (!creds) return;
-  const c = creds.find(x => x.id === id);
+function openURL(id) {
+  const c = currentCreds.find(x => x.id === id);
   if (!c || !c.url) return;
-  window.open(normalizeURL(c.url), '_blank');
-  secureCopy(c.username, 'Username');
+  openWebCredential(c);
 }
 
-async function copyIAM(id) {
-  const creds = await api('/api/credentials');
-  if (!creds) return;
-  const c = creds.find(x => x.id === id);
+function credentialClipboardText(c) {
+  const parts = [];
+  if (c.username) parts.push('Username: ' + c.username);
+  if (c.password) parts.push('Password: ' + c.password);
+  return parts.join('\n');
+}
+
+function openWebCredential(c) {
+  const text = credentialClipboardText(c);
+  if (text) {
+    secureCopy(text, c.username && c.password ? 'Username and password' : c.username ? 'Username' : 'Password');
+  }
+  const opened = window.open(normalizeURL(c.url), '_blank', 'noopener');
+  if (!opened) showToast('Popup blocked. Credentials copied.');
+}
+
+function copyIAM(id) {
+  const c = currentCreds.find(x => x.id === id);
   if (!c) return;
   const text = 'Access Key: ' + (c.password || '') + '\nSecret Key: ' + (c.secret_key || '');
   secureCopy(text, 'Access Key and Secret Key');
@@ -251,10 +289,8 @@ async function copyIAM(id) {
 
 let detailCredId = null;
 
-async function viewCredential(id) {
-  const creds = await api('/api/credentials');
-  if (!creds) return;
-  const c = creds.find(x => x.id === id);
+function viewCredential(id) {
+  const c = currentCreds.find(x => x.id === id);
   if (!c) return;
   detailCredId = c.id;
   const t = c.type || 'web';
@@ -378,9 +414,7 @@ function getHostPort(c) {
 async function connectSSH(id) {
   const btn = document.querySelector(`[data-connect-id="${id}"]`) || document.getElementById('detail-connect-btn');
   if (btn) btn.disabled = true;
-  const creds = await api('/api/credentials');
-  if (!creds) { if (btn) btn.disabled = false; return; }
-  const c = creds.find(x => x.id === id);
+  const c = currentCreds.find(x => x.id === id);
   if (!c || !c.url || !c.username) { if (btn) btn.disabled = false; return; }
   const { host, port } = getHostPort(c);
   const res = await api('/api/connect', {
@@ -395,14 +429,11 @@ async function connectSSH(id) {
   }
 }
 
-async function openFromDetail() {
+function openFromDetail() {
   if (!detailCredId) return;
-  const creds = await api('/api/credentials');
-  if (!creds) return;
-  const c = creds.find(x => x.id === detailCredId);
+  const c = currentCreds.find(x => x.id === detailCredId);
   if (!c || !c.url) return;
-  window.open(normalizeURL(c.url), '_blank');
-  secureCopy(c.username, 'Username');
+  openWebCredential(c);
   closeDetailModal();
 }
 
@@ -454,10 +485,8 @@ function showAddForm() {
   document.getElementById('modal').classList.remove('hidden');
 }
 
-async function showEditForm(id) {
-  const creds = await api('/api/credentials');
-  if (!creds) return;
-  const c = creds.find(x => x.id === id);
+function showEditForm(id) {
+  const c = currentCreds.find(x => x.id === id);
   if (!c) return;
   const t = c.type || 'web';
   document.getElementById('modal-title').textContent = 'Edit Credential';
@@ -578,35 +607,47 @@ function showBookmarkletModal() {
   const host = location.hostname || '127.0.0.1';
   const base = 'http://' + host + ':' + port;
   const code = `(function(){
-    var d=location.hostname.replace(/^www\\./,'');
-    fetch('${base}/api/lookup?domain='+encodeURIComponent(d),{headers:{'Content-Type':'application/json'}})
-    .then(function(r){return r.json()})
-    .then(function(creds){
-      if(!creds||!creds.length){alert('No credentials found for '+d);return}
-      var c=creds[0];
-      function fill(sel,val){
-        var els=document.querySelectorAll(sel);
+    function notice(msg,bad){
+      var t=document.createElement('div');
+      t.textContent=msg;
+      t.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:'+(bad?'#3a1515':'#1a1a2e')+';color:#e0e0e0;border:1px solid '+(bad?'#ff6b6b':'#6c63ff')+';padding:10px 20px;border-radius:8px;z-index:2147483647;font:14px sans-serif;max-width:80vw;white-space:normal;text-align:center;';
+      document.body.appendChild(t);setTimeout(function(){t.remove()},4500);
+    }
+    function visible(el){return !!(el.offsetWidth||el.offsetHeight||el.getClientRects().length)}
+    function setValue(el,val){
+      el.focus();
+      var proto=el instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;
+      var desc=Object.getOwnPropertyDescriptor(proto,'value')||Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el),'value');
+      if(desc&&desc.set){desc.set.call(el,val)}else{el.value=val}
+      try{el.dispatchEvent(new InputEvent('input',{bubbles:true,cancelable:true,inputType:'insertText',data:val}))}catch(e){el.dispatchEvent(new Event('input',{bubbles:true,cancelable:true}))}
+      el.dispatchEvent(new KeyboardEvent('keyup',{bubbles:true,cancelable:true}));
+      el.dispatchEvent(new Event('change',{bubbles:true,cancelable:true}));
+      el.blur();
+    }
+    function query(sel){try{return Array.prototype.slice.call(document.querySelectorAll(sel))}catch(e){return []}}
+    function fill(selectors,val){
+      for(var s=0;s<selectors.length;s++){
+        var els=query(selectors[s]);
         for(var i=0;i<els.length;i++){
           var el=els[i];
-          if(el.offsetParent!==null){
-            var nativeSet=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
-            nativeSet.call(el,val);
-            el.dispatchEvent(new Event('input',{bubbles:true}));
-            el.dispatchEvent(new Event('change',{bubbles:true}));
-            return true;
-          }
+          if(el&&/^(INPUT|TEXTAREA)$/.test(el.tagName)&&!el.disabled&&!el.readOnly&&visible(el)){setValue(el,val);return true}
         }
-        return false;
       }
-      var filled=false;
-      if(c.username){filled=fill('input[type="email"],input[type="text"],input[name*="user"],input[name*="email"],input[name*="login"],input[id*="user"],input[id*="email"],input[id*="login"],input[autocomplete="username"]',c.username)}
-      if(c.password){fill('input[type="password"],input[name*="pass"],input[id*="pass"],input[autocomplete="current-password"]',c.password)}
-      var msg='Vault: filled '+(c.username?'username':'')+(c.username&&c.password?' and ':'')+(c.password?'password':'')+' for '+d;
-      var t=document.createElement('div');t.textContent=msg;
-      t.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#e0e0e0;border:1px solid #6c63ff;padding:10px 20px;border-radius:8px;z-index:999999;font:14px sans-serif;';
-      document.body.appendChild(t);setTimeout(function(){t.remove()},3000);
+      return false;
+    }
+    var d=location.hostname.replace(/^www\\./,'');
+    fetch('${base}/api/lookup?domain='+encodeURIComponent(d),{mode:'cors',cache:'no-store'})
+    .then(function(r){if(!r.ok){throw new Error('Vault returned HTTP '+r.status)}return r.json()})
+    .then(function(creds){
+      if(creds&&creds.locked){notice('Vault is locked. Unlock it first.',true);return}
+      if(!Array.isArray(creds)||!creds.length){notice('No web credential found for '+d,true);return}
+      var c=creds[0];
+      var userOk=!c.username||fill(['input[autocomplete="username"]','input[type="email"]','input[name*="user" i],input[name*="email" i],input[name*="login" i]','input[id*="user" i],input[id*="email" i],input[id*="login" i]','input[type="text"]','input:not([type])'],c.username);
+      var passOk=!c.password||fill(['input[autocomplete="current-password"]','input[autocomplete="new-password"]','input[type="password"]','input[name*="pass" i],input[id*="pass" i]'],c.password);
+      if(userOk&&passOk){notice('Vault filled credentials for '+d,false)}
+      else{notice('Vault found credentials, but could not find '+(!userOk&&!passOk?'username/password':!userOk?'username':'password')+' field on this page.',true)}
     })
-    .catch(function(){alert('Could not connect to vault. Make sure it is running and unlocked.')});
+    .catch(function(e){notice('Could not connect to vault at ${base}: '+(e&&e.message?e.message:e),true)});
   })()`;
   const bookmarklet = 'javascript:' + encodeURIComponent(code);
   document.getElementById('bookmarklet-link').href = bookmarklet;

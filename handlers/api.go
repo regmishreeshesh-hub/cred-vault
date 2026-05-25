@@ -207,32 +207,22 @@ func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Lookup(w http.ResponseWriter, r *http.Request) {
-	domain := r.URL.Query().Get("domain")
+	domain := normalizeLookupDomain(r.URL.Query().Get("domain"))
 	if domain == "" {
 		http.Error(w, "domain required", http.StatusBadRequest)
 		return
 	}
-	domain = strings.ToLower(domain)
 	creds := h.Vault.List()
 	var matches []vault.Credential
 	for _, c := range creds {
 		if c.Type != "web" && c.Type != "" {
 			continue
 		}
-		credURL := strings.ToLower(c.URL)
-		if credURL == "" {
+		credDomain := normalizeLookupDomain(c.URL)
+		if credDomain == "" {
 			continue
 		}
-		// Extract hostname from credential URL
-		credDomain := credURL
-		if strings.Contains(credURL, "://") {
-			if u, err := url.Parse(credURL); err == nil {
-				credDomain = u.Hostname()
-			}
-		}
-		credDomain = strings.TrimPrefix(credDomain, "www.")
-		d := strings.TrimPrefix(domain, "www.")
-		if credDomain == d || strings.HasSuffix(credDomain, "."+d) || strings.HasSuffix(d, "."+credDomain) {
+		if credDomain == domain || strings.HasSuffix(credDomain, "."+domain) || strings.HasSuffix(domain, "."+credDomain) {
 			matches = append(matches, c)
 		}
 	}
@@ -242,11 +232,31 @@ func (h *Handler) Lookup(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(matches)
 }
 
+func normalizeLookupDomain(raw string) string {
+	raw = strings.ToLower(strings.TrimSpace(raw))
+	if raw == "" {
+		return ""
+	}
+	if strings.Contains(raw, "://") {
+		if u, err := url.Parse(raw); err == nil && u.Hostname() != "" {
+			raw = u.Hostname()
+		}
+	} else if strings.Contains(raw, "/") || strings.Contains(raw, ":") {
+		if u, err := url.Parse("//" + raw); err == nil && u.Hostname() != "" {
+			raw = u.Hostname()
+		}
+	}
+	raw = strings.TrimSuffix(raw, ".")
+	raw = strings.TrimPrefix(raw, "www.")
+	return raw
+}
+
 func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Private-Network", "true")
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
