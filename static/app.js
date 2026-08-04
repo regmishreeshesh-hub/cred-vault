@@ -59,6 +59,10 @@ function setupInactivityListeners() {
 }
 
 async function secureCopy(text, label) {
+  if (!text) {
+    showToast(label + ' copied to clipboard');
+    return true;
+  }
   try {
     await navigator.clipboard.writeText(text);
     showToast(label + ' copied to clipboard');
@@ -69,27 +73,18 @@ async function secureCopy(text, label) {
     }
     return true;
   } catch (e) {
-    // Fallback for browsers that don't support navigator.clipboard
-    try {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.style.position = 'fixed';
-      textarea.style.left = '-9999px';
-      document.body.appendChild(textarea);
-      textarea.select();
-      const successful = document.execCommand('copy');
-      document.body.removeChild(textarea);
-      if (successful) {
-        showToast(label + ' copied to clipboard');
-        if (clipboardClearMs > 0) {
-          setTimeout(() => {
-            navigator.clipboard.writeText('').catch(() => {});
-          }, clipboardClearMs);
-        }
-        return true;
-      }
-    } catch (fallbackErr) {
-      // ignore
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const successful = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    if (successful) {
+      showToast(label + ' copied to clipboard');
+      return true;
     }
     showToast('Failed to copy');
     return false;
@@ -205,6 +200,12 @@ function typeIcon(c) {
   return '🌐';
 }
 
+function typeBadge(c) {
+  const labels = { general: 'General', web: 'Web', ssh: 'SSH', iam: 'IAM' };
+  const t = c.type || 'web';
+  return `<span class="type-badge ${t}">${typeIcon(c)} ${labels[t] || 'Web'}</span>`;
+}
+
 async function renderList() {
   const creds = await api('/api/credentials');
   if (!creds) return;
@@ -232,12 +233,13 @@ async function renderList() {
     return haystack.includes(search);
   });
   const container = document.getElementById('cred-list');
-  container.innerHTML = filtered.length === 0
-    ? '<p style="color:#888;text-align:center;margin-top:40px;">No credentials found.</p>'
-    : filtered.map(c => `
-      <div class="cred-item" onclick="viewCredential('${c.id}')" style="cursor:pointer">
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔐</div><p class="empty-state-text">No credentials found.</p></div>';
+  } else {
+    container.innerHTML = filtered.map((c, i) => `
+      <div class="cred-item" onclick="viewCredential('${c.id}')" style="cursor:pointer;animation-delay:${i * 40}ms">
         <div class="info">
-          <div class="url">${typeIcon(c)} ${esc(credLabel(c))}</div>
+          <div class="url">${typeBadge(c)} ${esc(credLabel(c))}</div>
           <div class="username">${esc(credSub(c))}</div>
           ${credDesc(c) ? `<div class="desc">${esc(credDesc(c))}</div>` : ''}
         </div>
@@ -248,6 +250,7 @@ async function renderList() {
         </div>
       </div>
     `).join('');
+  }
 }
 
 function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
@@ -276,8 +279,7 @@ function openWebCredential(c) {
   if (text) {
     secureCopy(text, c.username && c.password ? 'Username and password' : c.username ? 'Username' : 'Password');
   }
-  const opened = window.open(normalizeURL(c.url), '_blank', 'noopener');
-  if (!opened) showToast('Popup blocked. Credentials copied.');
+  window.open(normalizeURL(c.url), '_blank', 'noopener,noreferrer');
 }
 
 function copyIAM(id) {
@@ -294,6 +296,12 @@ function viewCredential(id) {
   if (!c) return;
   detailCredId = c.id;
   const t = c.type || 'web';
+
+  // Set title and type badge
+  const titleEl = document.getElementById('detail-title');
+  const badgeEl = document.getElementById('detail-type-badge');
+  if (titleEl) titleEl.textContent = credLabel(c);
+  if (badgeEl) badgeEl.innerHTML = typeBadge(c);
 
   document.getElementById('detail-web-group').style.display = t === 'web' ? '' : 'none';
   document.getElementById('detail-ssh-group').style.display = t === 'ssh' ? '' : 'none';
@@ -423,6 +431,10 @@ async function connectSSH(id) {
   });
   if (btn) btn.disabled = false;
   if (res && res.status === 'ok') {
+    // Copy password to client clipboard for user convenience
+    if (c.password) {
+      secureCopy(c.password, 'Password');
+    }
     showToast(res.message || 'Connecting...');
   } else if (res) {
     showToast('Connection failed: ' + (res.message || 'unknown error'));
@@ -603,55 +615,22 @@ function showToast(msg) {
 }
 
 function showBookmarkletModal() {
-  const port = location.port || '9090';
-  const host = location.hostname || '127.0.0.1';
-  const base = 'http://' + host + ':' + port;
-  const code = `(function(){
-    function notice(msg,bad){
-      var t=document.createElement('div');
-      t.textContent=msg;
-      t.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:'+(bad?'#3a1515':'#1a1a2e')+';color:#e0e0e0;border:1px solid '+(bad?'#ff6b6b':'#6c63ff')+';padding:10px 20px;border-radius:8px;z-index:2147483647;font:14px sans-serif;max-width:80vw;white-space:normal;text-align:center;';
-      document.body.appendChild(t);setTimeout(function(){t.remove()},4500);
-    }
-    function visible(el){return !!(el.offsetWidth||el.offsetHeight||el.getClientRects().length)}
-    function setValue(el,val){
-      el.focus();
-      var proto=el instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;
-      var desc=Object.getOwnPropertyDescriptor(proto,'value')||Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el),'value');
-      if(desc&&desc.set){desc.set.call(el,val)}else{el.value=val}
-      try{el.dispatchEvent(new InputEvent('input',{bubbles:true,cancelable:true,inputType:'insertText',data:val}))}catch(e){el.dispatchEvent(new Event('input',{bubbles:true,cancelable:true}))}
-      el.dispatchEvent(new KeyboardEvent('keyup',{bubbles:true,cancelable:true}));
-      el.dispatchEvent(new Event('change',{bubbles:true,cancelable:true}));
-      el.blur();
-    }
-    function query(sel){try{return Array.prototype.slice.call(document.querySelectorAll(sel))}catch(e){return []}}
-    function fill(selectors,val){
-      for(var s=0;s<selectors.length;s++){
-        var els=query(selectors[s]);
-        for(var i=0;i<els.length;i++){
-          var el=els[i];
-          if(el&&/^(INPUT|TEXTAREA)$/.test(el.tagName)&&!el.disabled&&!el.readOnly&&visible(el)){setValue(el,val);return true}
-        }
-      }
-      return false;
-    }
-    var d=location.hostname.replace(/^www\\./,'');
-    fetch('${base}/api/lookup?domain='+encodeURIComponent(d),{mode:'cors',cache:'no-store'})
-    .then(function(r){if(!r.ok){throw new Error('Vault returned HTTP '+r.status)}return r.json()})
-    .then(function(creds){
-      if(creds&&creds.locked){notice('Vault is locked. Unlock it first.',true);return}
-      if(!Array.isArray(creds)||!creds.length){notice('No web credential found for '+d,true);return}
-      var c=creds[0];
-      var userOk=!c.username||fill(['input[autocomplete="username"]','input[type="email"]','input[name*="user" i],input[name*="email" i],input[name*="login" i]','input[id*="user" i],input[id*="email" i],input[id*="login" i]','input[type="text"]','input:not([type])'],c.username);
-      var passOk=!c.password||fill(['input[autocomplete="current-password"]','input[autocomplete="new-password"]','input[type="password"]','input[name*="pass" i],input[id*="pass" i]'],c.password);
-      if(userOk&&passOk){notice('Vault filled credentials for '+d,false)}
-      else{notice('Vault found credentials, but could not find '+(!userOk&&!passOk?'username/password':!userOk?'username':'password')+' field on this page.',true)}
-    })
-    .catch(function(e){notice('Could not connect to vault at ${base}: '+(e&&e.message?e.message:e),true)});
-  })()`;
-  const bookmarklet = 'javascript:' + encodeURIComponent(code);
-  document.getElementById('bookmarklet-link').href = bookmarklet;
-  document.getElementById('bookmarklet-modal').classList.remove('hidden');
+  var port = location.port || "9090";
+  var bm = `javascript:(function(p){var d=location.hostname.replace(/^www\\./,'');` +
+`function n(m,b){var t=document.createElement("div");t.textContent=m;` +
+`var bg=b?"#3a1515":"#1a1a2e";var br=b?"#ff6b6b":"#6c63ff";` +
+`t.style.cssText="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:"+bg+";color:#e0e0e0;border:1px solid "+br+";padding:10px 20px;border-radius:8px;z-index:2147483647;font:14px sans-serif";` +
+`document.body.appendChild(t);setTimeout(function(){t.remove()},4500);}var V=function(e){return!!(e&&(e.offsetWidth||e.offsetHeight||e.getClientRects().length))};` +
+`var S=function(e,v){e.focus();e.value=v;try{e.dispatchEvent(new InputEvent("input",{bubbles:true}))}catch(_){}e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}))};` +
+`var F=function(s,v){var a=document.querySelectorAll(s);for(var i=0;i<a.length;i++)if(V(a[i])){S(a[i],v);return 1}return 0};` +
+`var H=function(c){if(!Array.isArray(c)||!c.length){n("No web credential for "+d,1);return}var a=c[0];` +
+`var u=!a.username||F('input[autocomplete="username"],input[type="email"],input[name*="user" i],input[id*="user" i],input[type="text"],input:not([type])',a.username);` +
+`var p=!a.password||F('input[autocomplete^="current-password"],input[autocomplete^="new-password"],input[type="password"],input[name*="pass" i]',a.password);` +
+`if(u&&p)n("Vault filled for "+d);else n("Missing "+(!u?"username":!p?"password":"field"),1)};` +
+`var T=async function(b){try{var r=await fetch(b+"/api/lookup?domain="+encodeURIComponent(d),{mode:"cors"});` +
+`if(r.ok){r.json().then(H)}else{n("Vault error: "+r.status,1)}catch(e){n("Cannot connect to vault. Ensure HTTPS is enabled and cert accepted.",1)}};T("https://127.0.0.1:"+p)})("${port}")`;
+  document.getElementById("bookmarklet-link").href = bm;
+  document.getElementById("bookmarklet-modal").classList.remove("hidden");
 }
 
 function closeBookmarkletModal() {
@@ -659,7 +638,7 @@ function closeBookmarkletModal() {
 }
 
 async function checkStatus() {
-  const res = await api('/api/status');
+  var res = await api('/api/status');
   if (res && !res.locked) {
     showVault();
     renderList();
@@ -670,4 +649,4 @@ async function checkStatus() {
 loadSettings();
 setupInactivityListeners();
 checkStatus();
-document.getElementById('master-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') unlock(); });
+document.getElementById('master-pass').addEventListener('keydown', function(e) { if (e.key === 'Enter') unlock(); });

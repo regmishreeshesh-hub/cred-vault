@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -146,51 +147,27 @@ func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
 		req.Port = 22
 	}
 
-	identityArg := ""
 	if req.KeyFile != "" {
-		if _, err := os.Stat(req.KeyFile); os.IsNotExist(err) {
-			json.NewEncoder(w).Encode(statusResponse{Status: "error", Message: "key file not found: " + req.KeyFile})
+		keyFile := expandPath(req.KeyFile)
+		if _, err := os.Stat(keyFile); os.IsNotExist(err) {
+			json.NewEncoder(w).Encode(statusResponse{Status: "error", Message: "key file not found: " + keyFile})
 			return
 		}
-		identityArg = fmt.Sprintf(`-i "%s"`, req.KeyFile)
+		req.KeyFile = keyFile
 	}
 
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		args := []string{"/k", "ssh", "-v", "-o", "StrictHostKeyChecking=no"}
-		if req.KeyFile != "" {
-			args = append(args, "-i", req.KeyFile)
+	clipboardMsg := ""
+	if req.Password != "" {
+		if err := copyToClipboard(req.Password); err != nil {
+			clipboardMsg = " (clipboard unavailable: " + err.Error() + ")"
 		}
-		args = append(args, "-p", fmt.Sprintf("%d", req.Port), fmt.Sprintf("%s@%s", req.Username, req.Host))
-		var quoted []string
-		for _, a := range args {
-			quoted = append(quoted, `"`+a+`"`)
-		}
-		psScript := fmt.Sprintf(`Start-Process -WindowStyle Normal -FilePath "cmd" -ArgumentList @(%s)`, strings.Join(quoted, ","))
-		if req.Password != "" {
-			escaped := strings.ReplaceAll(req.Password, "'", "''")
-			psScript = fmt.Sprintf(`Set-Clipboard -Value '%s'; %s`, escaped, psScript)
-		}
-		cmd = exec.Command("powershell", "-Command", psScript)
-	} else {
-		sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no %s -p %d %s@%s", identityArg, req.Port, req.Username, req.Host)
-		var termCmd string
-		if _, err := exec.LookPath("x-terminal-emulator"); err == nil {
-			termCmd = fmt.Sprintf("x-terminal-emulator -e bash -c '%s; exec bash'", sshCmd)
-		} else if _, err := exec.LookPath("gnome-terminal"); err == nil {
-			termCmd = fmt.Sprintf("gnome-terminal -- bash -c '%s; exec bash'", sshCmd)
-		} else if _, err := exec.LookPath("osascript"); err == nil {
-			termCmd = fmt.Sprintf("osascript -e 'tell app \"Terminal\" to do script \"%s\"'", sshCmd)
-		} else {
-			json.NewEncoder(w).Encode(statusResponse{Status: "error", Message: "no terminal emulator found"})
-			return
-		}
-		copyCmd := ""
-		if req.Password != "" {
-			copyCmd = fmt.Sprintf("echo -n '%s' | pbcopy 2>/dev/null || echo -n '%s' | xclip -selection clipboard 2>/dev/null; ", req.Password, req.Password)
-		}
-		shellCmd := copyCmd + termCmd
-		cmd = exec.Command("bash", "-c", shellCmd)
+	}
+
+	sshArgs := buildSSHArgs(req.Host, req.Port, req.Username, req.KeyFile)
+	cmd, err := openTerminal(sshArgs)
+	if err != nil {
+		json.NewEncoder(w).Encode(statusResponse{Status: "error", Message: err.Error()})
+		return
 	}
 
 	if err := cmd.Start(); err != nil {
@@ -203,7 +180,108 @@ func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
 	} else if req.Password != "" {
 		msg = "Password copied — paste it in the terminal"
 	}
-	json.NewEncoder(w).Encode(statusResponse{Status: "ok", Message: msg})
+	json.NewEncoder(w).Encode(statusResponse{Status: "ok", Message: msg + clipboardMsg})
+}
+
+func buildSSHArgs(host string, port int, username string, keyFile string) []string {
+	args := []string{"-o", "StrictHostKeyChecking=no"}
+	if keyFile != "" {
+		args = append(args, "-i", keyFile)
+	}
+	args = append(args, "-p", fmt.Sprintf("%d", port), fmt.Sprintf("%s@%s", username, host))
+	return args
+}
+
+func copyToClipboard(text string) error {
+    switch runtime.GOOS {
+    case "darwin":
+        cmd := exec.Command("pbcopy")
+        cmd.Stdin = strings.NewReader(text)
+        return cmd.Run()
+    case "windows":
+        cmd := exec.Command("powershell", "-Command", "Set-Clipboard", "-Value", text)
+        return cmd.Run()
+    default:
+        // Try Wayland clipboard utility first
+        if _, err := exec.LookPath("wl-copy"); err == nil {
+            cmd := exec.Command("wl-copy")
+            cmd.Stdin = strings.NewReader(text)
+            if err := cmd.Run(); err == nil {
+                return nil
+            }
+        }
+        // Fall back to X11 utilities
+        if _, err := exec.LookPath("xclip"); err == nil {
+            cmd := exec.Command("xclip", "-selection", "clipboard")
+            cmd.Stdin = strings.NewReader(text)
+            if err := cmd.Run(); err == nil {
+                return nil
+            }
+        }
+        if _, err := exec.LookPath("xsel"); err == nil {
+            cmd := exec.Command("xsel", "--clipboard", "--input")
+            cmd.Stdin = strings.NewReader(text)
+            if err := cmd.Run(); err == nil {
+                return nil
+            }
+        }
+        return fmt.Errorf("no clipboard utility available")
+    }
+}
+
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
+}
+
+func expandPath(path string) string {
+	if path == "~" {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			return home
+		}
+	} else if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			path = filepath.Join(home, path[2:])
+		}
+	}
+	return path
+}
+
+func buildSSHCmd(sshArgs []string) string {
+	var sb strings.Builder
+	sb.WriteString("ssh")
+	for _, arg := range sshArgs {
+		sb.WriteString(" ")
+		sb.WriteString(shellQuote(arg))
+	}
+	sb.WriteString("; exec bash")
+	return sb.String()
+}
+
+func openTerminal(sshArgs []string) (*exec.Cmd, error) {
+	sshCmd := buildSSHCmd(sshArgs)
+	switch runtime.GOOS {
+	case "windows":
+		allArgs := append([]string{"/k", "ssh"}, sshArgs...)
+		return exec.Command("cmd", allArgs...), nil
+	case "darwin":
+		escaped := strings.ReplaceAll(sshCmd, `\`, `\\`)
+		escaped = strings.ReplaceAll(escaped, `"`, `\"`)
+		script := fmt.Sprintf(`tell app "Terminal" to do script "%s"`, escaped)
+		return exec.Command("osascript", "-e", script), nil
+	default:
+		terminals := []string{"gnome-terminal", "x-terminal-emulator", "xterm", "mate-terminal", "xfce4-terminal"}
+		for _, term := range terminals {
+			if _, err := exec.LookPath(term); err != nil {
+				continue
+			}
+			args := []string{"--", "bash", "-c", sshCmd}
+			return exec.Command(term, args...), nil
+		}
+		return nil, fmt.Errorf("no terminal emulator found (tried: %s)", strings.Join(terminals, ", "))
+	}
 }
 
 func (h *Handler) Lookup(w http.ResponseWriter, r *http.Request) {
@@ -256,8 +334,8 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		w.Header().Set("Access-Control-Allow-Private-Network", "true")
 		if r.Method == "OPTIONS" {
+			w.Header().Set("Access-Control-Allow-Private-Network", "true")
 			w.WriteHeader(http.StatusOK)
 			return
 		}

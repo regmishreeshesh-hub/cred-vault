@@ -1,0 +1,17 @@
+sudo sed -i 's/"IsZigramEnabled": false/"IsZigramEnabled": true/' /var/www/html/iSend-Money-Transfer-PROD/appsettings.json
+ 
+ 
+grep '"IsZigramEnabled"' /var/www/html/iSend-Money-Transfer-PROD/appsettings.json
+ 
+ 
+sudo sed -i 's/"IsZigramEnabled": true/"IsZigramEnabled": false/' /var/www/html/iSend-Money-Transfer-PROD/appsettings.json
+
+
+ssh debian@202.51.83.54 "sudo sed -i -E 's/^[[:space:]]*\/\/[[:space:]]*(\"IsZigramEnabled\"[[:space:]]*:[[:space:]]*)(true|false)/  \1%VALUE%/; s/^([[:space:]]*)\"IsZigramEnabled\"([[:space:]]*:[[:space:]]*)(true|false)/\1\"IsZigramEnabled\"\2%VALUE%/' /var/www/html/iSend-Money-Transfer-PROD/appsettings.json && echo ===== Updated appsettings.json ===== && cat /var/www/html/iSend-Money-Transfer-PROD/appsettings.json"
+
+
+ssh debian@202.51.83.54 "sudo sed -i -E 's/^([[:space:]]*)\/\/[[:space:]]*(\"IsZigramEnabled\")/\1\2/' /var/www/html/.../appsettings.json && jq '.IsZigramEnabled = %VALUE%' /var/www/html/.../appsettings.json > /tmp/appsettings.json && sudo mv /tmp/appsettings.json /var/www/html/.../appsettings.json && ..."
+
+
+
+systemctl list-units --type=service | grep -i kestrel

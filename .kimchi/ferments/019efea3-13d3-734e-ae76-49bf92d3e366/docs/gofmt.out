@@ -1,0 +1,39 @@
+diff handlers/api.go.orig handlers/api.go
+--- handlers/api.go.orig
++++ handlers/api.go
+@@ -22,10 +22,10 @@
+ }
+ 
+ type statusResponse struct {
+-	Status    string `json:"status"`
+-	Message   string `json:"message,omitempty"`
+-	Locked    bool   `json:"locked"`
+-	FirstRun  bool   `json:"first_run"`
++	Status   string `json:"status"`
++	Message  string `json:"message,omitempty"`
++	Locked   bool   `json:"locked"`
++	FirstRun bool   `json:"first_run"`
+ }
+ 
+ func NewHandler(v *vault.Vault) *Handler {
+diff main.go.orig main.go
+--- main.go.orig
++++ main.go
+@@ -136,8 +136,8 @@
+ 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+ 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+ 		BasicConstraintsValid: true,
+-		DNSNames:            []string{"localhost", "127.0.0.1"},
+-		IPAddresses:         []net.IP{net.ParseIP("127.0.0.1")},
++		DNSNames:              []string{"localhost", "127.0.0.1"},
++		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+ 	}
+ 
+ 	derBytes, err := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
+@@ -169,4 +169,4 @@
+ 	default:
+ 		exec.Command("xdg-open", url).Start()
+ 	}
+-}
+\ No newline at end of file
++}

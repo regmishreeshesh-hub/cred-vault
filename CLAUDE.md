@@ -14,7 +14,7 @@ go build -o cred-vault .
 # Build Linux AMD64 binary
 GOOS=linux GOARCH=amd64 go build -o cred-vault-linux .
 
-# Run (opens browser at http://127.0.0.1:9090)
+# Run (opens browser at https://127.0.0.1:9090)
 ./cred-vault
 
 # Run on a custom port or vault file
@@ -27,11 +27,13 @@ There are no tests in this project.
 
 The app is a single-process Go HTTP server. Static frontend files are embedded into the binary at compile time via `//go:embed static/*` in `main.go`.
 
+**TLS**: On startup the server looks for a cert/key at `~/.cred-vault/{cert,key}.pem`, generating a 10-year self-signed cert on first run if absent, and serves over HTTPS. If binding TLS fails, it falls back to plain HTTP on the same port. HTTPS is required for the bookmarklet (see below) since browsers block mixed-content requests from HTTPS login pages to `http://127.0.0.1`; accept the self-signed cert warning once in-browser.
+
 **Vault state machine**: The vault starts locked. Calling `POST /api/unlock` decrypts `vault.json` into memory and stores the master password in `Handler.MasterPass`. All mutating API calls re-encrypt and persist the entire `vault.json` on each write. Calling `POST /api/lock` wipes the in-memory data and clears the master password.
 
 **Encryption** ([vault/crypto.go](vault/crypto.go)): AES-256-GCM with a key derived via PBKDF2-SHA256 (600,000 iterations). Each save generates a fresh random salt and nonce, so the ciphertext changes on every write even with the same data.
 
-**vault.json** format ([vault/models.go](vault/models.go)): `{ salt, nonce, ciphertext }` — all base64-encoded bytes. The decrypted payload is a JSON array of `Credential` objects.
+**vault.json** format ([vault/models.go](vault/models.go)): `{ salt, nonce, ciphertext }` — all base64-encoded bytes. The decrypted payload is a `VaultData` object (`{ "credentials": [...] }`) holding an array of `Credential` objects.
 
 **Packages**:
 - `vault/` — `Vault` struct with a `sync.Mutex`; all CRUD methods acquire the lock. `VaultExists`, `Unlock`, `Lock`, `Save`, `List`, `Add`, `Update`, `Delete`.

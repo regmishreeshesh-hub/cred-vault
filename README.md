@@ -47,3 +47,11 @@ Then open the URL printed in the terminal. By default, the app listens on `127.0
 ## Notes
 
 Generated binaries are intentionally ignored by Git. Commit the source code and rebuild binaries locally when needed.
+
+## Bookmarklet / Auto-fill
+
+The autofill bookmarklet requires HTTPS to work on modern websites (mixed content blocking prevents `http://` requests from HTTPS pages). The vault generates a self-signed certificate on first run for `https://127.0.0.1:9090`. You must accept this certificate in your browser for the bookmarklet to work.
+
+1. Visit `https://127.0.0.1:9090` and click through the certificate warning
+2. Add the bookmarklet to your bookmarks bar
+3. When on a login page, click the bookmark to auto-fill credentials

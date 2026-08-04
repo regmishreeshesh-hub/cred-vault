@@ -1,0 +1,17 @@
+{
+  "id": "019eca39-8bb5-76bd-b73d-ca5344200339",
+  "name": "Audit project for bugs",
+  "description": "Audit the current project codebase for bugs, logic errors, security issues, or other defects. Provide a comprehensive list of bugs found, with file paths, line numbers, and explanations of why each is problematic.",
+  "status": "draft",
+  "worktree": {
+    "path": "/home/fintech/cred-vault",
+    "branch": "main",
+    "commit": "f596e1290d0cc5674f2787ce578ebd178c046aab"
+  },
+  "scoping": {},
+  "phases": [],
+  "decisions": [],
+  "memories": [],
+  "createdAt": "2026-06-15T07:40:29.493Z",
+  "updatedAt": "2026-06-15T07:40:29.493Z"
+}
