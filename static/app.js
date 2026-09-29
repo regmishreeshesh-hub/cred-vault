@@ -18,6 +18,14 @@ let autoLockMinutes = 10;
 // Clipboard auto-clear
 let clipboardClearMs = 15000;
 let currentCreds = [];
+let typeFilter = '';
+
+function setTypeFilter(type, el) {
+  typeFilter = type;
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(a => a.classList.remove('active'));
+  el.classList.add('active');
+  renderList();
+}
 
 function loadSettings() {
   const savedLock = localStorage.getItem('cred-vault-auto-lock');
@@ -137,6 +145,7 @@ async function lock() {
 }
 
 function showLogin(firstRun) {
+  document.getElementById('app').classList.remove('hidden');
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('vault-screen').classList.add('hidden');
   const prompt = document.getElementById('login-prompt');
@@ -159,6 +168,7 @@ function showLogin(firstRun) {
 }
 
 function showVault() {
+  document.getElementById('app').classList.add('hidden');
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('vault-screen').classList.remove('hidden');
   loadSettings();
@@ -210,8 +220,14 @@ async function renderList() {
   const creds = await api('/api/credentials');
   if (!creds) return;
   currentCreds = creds;
+  const counts = { general: 0, web: 0, ssh: 0, iam: 0 };
+  creds.forEach(c => { if (counts[c.type] !== undefined) counts[c.type]++; });
+  document.getElementById('count-all').textContent = creds.length;
+  document.getElementById('count-general').textContent = counts.general;
+  document.getElementById('count-web').textContent = counts.web;
+  document.getElementById('count-ssh').textContent = counts.ssh;
+  document.getElementById('count-iam').textContent = counts.iam;
   const search = document.getElementById('search').value.toLowerCase();
-  const typeFilter = document.getElementById('type-filter').value;
   const filtered = creds.filter(c => {
     if (typeFilter && c.type !== typeFilter) return false;
     if (!search) return true;

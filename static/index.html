@@ -23,48 +23,54 @@
       <button id="login-btn" onclick="unlock()">Unlock</button>
     </div>
   </div>
+</div>
 
-  <!-- Vault Screen -->
-  <div id="vault-screen" class="screen hidden">
-    <div class="header">
-      <h1>🔐 Credential Vault</h1>
-      <button class="btn-secondary" onclick="lock()">Lock</button>
-    </div>
-    <div class="toolbar">
-      <button onclick="showAddForm()">+ Add Credential</button>
-      <select id="type-filter" onchange="renderList()">
-        <option value="">All Types</option>
-        <option value="general">📄 General</option>
-        <option value="web">🌐 Web Login</option>
-        <option value="ssh">🖥 SSH Server</option>
-        <option value="iam">🔑 IAM User</option>
-      </select>
-      <input type="text" id="search" placeholder="Search credentials..." oninput="renderList()">
+<!-- Vault Screen -->
+<div id="vault-screen" class="vault-shell hidden">
+  <aside class="sidebar">
+    <div class="sidebar-brand">🔐 Credential Vault</div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" onclick="setTypeFilter('', this); return false;">All <span class="count" id="count-all">0</span></a>
+      <a href="#" class="nav-item" onclick="setTypeFilter('general', this); return false;">📄 General <span class="count" id="count-general">0</span></a>
+      <a href="#" class="nav-item" onclick="setTypeFilter('web', this); return false;">🌐 Web Login <span class="count" id="count-web">0</span></a>
+      <a href="#" class="nav-item" onclick="setTypeFilter('ssh', this); return false;">🖥 SSH Server <span class="count" id="count-ssh">0</span></a>
+      <a href="#" class="nav-item" onclick="setTypeFilter('iam', this); return false;">🔑 IAM User <span class="count" id="count-iam">0</span></a>
+    </nav>
+    <hr class="sidebar-divider">
+    <div class="sidebar-actions">
       <button class="btn-secondary" onclick="showBookmarkletModal()">⚡ Autofill</button>
-      <div class="settings-group">
-        <label title="Auto-lock after inactivity">⏱ Auto-lock:
-          <select id="auto-lock-timeout" onchange="updateAutoLock()">
-            <option value="0">Off</option>
-            <option value="5">5 min</option>
-            <option value="10" selected>10 min</option>
-            <option value="15">15 min</option>
-            <option value="30">30 min</option>
-            <option value="60">60 min</option>
-          </select>
-        </label>
-        <label title="Clear clipboard after copying">📋 Clipboard:
-          <select id="clipboard-timeout" onchange="updateClipboardTimeout()">
-            <option value="0">Off</option>
-            <option value="10">10 sec</option>
-            <option value="15" selected>15 sec</option>
-            <option value="30">30 sec</option>
-            <option value="60">60 sec</option>
-          </select>
-        </label>
-      </div>
+    </div>
+    <hr class="sidebar-divider">
+    <div class="sidebar-settings">
+      <label title="Auto-lock after inactivity">⏱ Auto-lock
+        <select id="auto-lock-timeout" onchange="updateAutoLock()">
+          <option value="0">Off</option>
+          <option value="5">5 min</option>
+          <option value="10" selected>10 min</option>
+          <option value="15">15 min</option>
+          <option value="30">30 min</option>
+          <option value="60">60 min</option>
+        </select>
+      </label>
+      <label title="Clear clipboard after copying">📋 Clipboard
+        <select id="clipboard-timeout" onchange="updateClipboardTimeout()">
+          <option value="0">Off</option>
+          <option value="10">10 sec</option>
+          <option value="15" selected>15 sec</option>
+          <option value="30">30 sec</option>
+          <option value="60">60 sec</option>
+        </select>
+      </label>
+    </div>
+    <button class="btn-secondary sidebar-lock" onclick="lock()">Lock Vault</button>
+  </aside>
+  <main class="vault-main">
+    <div class="main-toolbar">
+      <input type="text" id="search" placeholder="Search credentials..." oninput="renderList()">
+      <button onclick="showAddForm()">+ Add Credential</button>
     </div>
     <div id="cred-list"></div>
-  </div>
+  </main>
 </div>
 
 <!-- Add/Edit Modal -->

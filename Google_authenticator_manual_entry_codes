@@ -1,0 +1,16 @@
+
+to add in Google Authenticator app or chrome extension
+All are TOTP, SHA1, 6 digits. Copy list for manual entry:
+
+
+
+1. shreeshes.regmi@isend.com.sg (AWS SSO)      JBWATFZ4BWLXYEVDDOODFOSY4EVHHDOD
+2. support.cloud@fintech.com.np (Data | Hub)   OUTW3TWWFKTWX55P47ATMXZ672CWGLST
+3. cloud@ipayremit.com (AWS SSO)              2LV5FYFNP46QXCUMAJ3P3DP5CRNDGFPZ
+4. cloudisend@gmail.com (Google)              WELZUIJ3B2X4RNSPOCVP4PEFJO3POLCV
+5. cloud@ipayremit.com (Microsoft)            RRTVFZKLGYYXQGRF
+6. suresh.bhattarai@ipayremit.com (Microsoft) FFTW6RVJ6GSTTS7J
+7. CloudAdmin@990151165397 (AWS)              U4OEDDK7LXGS466QTUC4PUM2YBO5TS2NWIXJM5UZYTZAXFSDY6L2SEMHQEHOYQ6B
+8. cloud@fintech.com.np (AWS SSO)             J2NB6DHSEC4BPKSBD6WJVQLFQ5SJDJY6
+9. shreeshes.regmi@fintech.com.np (AWS SSO)   4YA7B5PHAYPKK5FG5VQXNN2HDMGHPPLX
+10. cloud@ipayremit.com (Sophos)              GAPLZED6XVFL622E
