@@ -52,7 +52,7 @@ func main() {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	}))
-	mux.HandleFunc("/api/lookup", h.Middleware(h.Lookup))
+	mux.HandleFunc("/api/lookup", h.CORSMiddleware(h.Lookup))
 	mux.HandleFunc("/api/credentials/", h.Middleware(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case "PUT":
@@ -136,8 +136,8 @@ func generateSelfSignedCert(certPath, keyPath string) {
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
-		DNSNames:            []string{"localhost", "127.0.0.1"},
-		IPAddresses:         []net.IP{net.ParseIP("127.0.0.1")},
+		DNSNames:              []string{"localhost", "127.0.0.1"},
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
 	}
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)

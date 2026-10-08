@@ -23,10 +23,10 @@ type Handler struct {
 }
 
 type statusResponse struct {
-	Status    string `json:"status"`
-	Message   string `json:"message,omitempty"`
-	Locked    bool   `json:"locked"`
-	FirstRun  bool   `json:"first_run"`
+	Status   string `json:"status"`
+	Message  string `json:"message,omitempty"`
+	Locked   bool   `json:"locked"`
+	FirstRun bool   `json:"first_run"`
 }
 
 func NewHandler(v *vault.Vault) *Handler {
@@ -193,42 +193,41 @@ func buildSSHArgs(host string, port int, username string, keyFile string) []stri
 }
 
 func copyToClipboard(text string) error {
-    switch runtime.GOOS {
-    case "darwin":
-        cmd := exec.Command("pbcopy")
-        cmd.Stdin = strings.NewReader(text)
-        return cmd.Run()
-    case "windows":
-        cmd := exec.Command("powershell", "-Command", "Set-Clipboard", "-Value", text)
-        return cmd.Run()
-    default:
-        // Try Wayland clipboard utility first
-        if _, err := exec.LookPath("wl-copy"); err == nil {
-            cmd := exec.Command("wl-copy")
-            cmd.Stdin = strings.NewReader(text)
-            if err := cmd.Run(); err == nil {
-                return nil
-            }
-        }
-        // Fall back to X11 utilities
-        if _, err := exec.LookPath("xclip"); err == nil {
-            cmd := exec.Command("xclip", "-selection", "clipboard")
-            cmd.Stdin = strings.NewReader(text)
-            if err := cmd.Run(); err == nil {
-                return nil
-            }
-        }
-        if _, err := exec.LookPath("xsel"); err == nil {
-            cmd := exec.Command("xsel", "--clipboard", "--input")
-            cmd.Stdin = strings.NewReader(text)
-            if err := cmd.Run(); err == nil {
-                return nil
-            }
-        }
-        return fmt.Errorf("no clipboard utility available")
-    }
+	switch runtime.GOOS {
+	case "darwin":
+		cmd := exec.Command("pbcopy")
+		cmd.Stdin = strings.NewReader(text)
+		return cmd.Run()
+	case "windows":
+		cmd := exec.Command("powershell", "-Command", "Set-Clipboard", "-Value", text)
+		return cmd.Run()
+	default:
+		// Try Wayland clipboard utility first
+		if _, err := exec.LookPath("wl-copy"); err == nil {
+			cmd := exec.Command("wl-copy")
+			cmd.Stdin = strings.NewReader(text)
+			if err := cmd.Run(); err == nil {
+				return nil
+			}
+		}
+		// Fall back to X11 utilities
+		if _, err := exec.LookPath("xclip"); err == nil {
+			cmd := exec.Command("xclip", "-selection", "clipboard")
+			cmd.Stdin = strings.NewReader(text)
+			if err := cmd.Run(); err == nil {
+				return nil
+			}
+		}
+		if _, err := exec.LookPath("xsel"); err == nil {
+			cmd := exec.Command("xsel", "--clipboard", "--input")
+			cmd.Stdin = strings.NewReader(text)
+			if err := cmd.Run(); err == nil {
+				return nil
+			}
+		}
+		return fmt.Errorf("no clipboard utility available")
+	}
 }
-
 
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
@@ -331,14 +330,6 @@ func normalizeLookupDomain(raw string) string {
 
 func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		if r.Method == "OPTIONS" {
-			w.Header().Set("Access-Control-Allow-Private-Network", "true")
-			w.WriteHeader(http.StatusOK)
-			return
-		}
 		if h.Vault.IsLocked() || h.MasterPass == "" {
 			if r.URL.Path != "/api/status" && r.URL.Path != "/api/unlock" {
 				json.NewEncoder(w).Encode(statusResponse{
@@ -349,5 +340,22 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 			}
 		}
 		next(w, r)
+	}
+}
+
+// CORSMiddleware allows cross-origin GET requests. It is only applied to
+// /api/lookup, since that is the sole endpoint the bookmarklet calls from
+// arbitrary third-party pages; every other endpoint is same-origin only.
+func (h *Handler) CORSMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		if r.Method == "OPTIONS" {
+			w.Header().Set("Access-Control-Allow-Private-Network", "true")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		h.Middleware(next)(w, r)
 	}
 }

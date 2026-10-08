@@ -144,10 +144,66 @@ async function lock() {
   showLogin(false);
 }
 
+// Full-page cmatrix-style digital rain, shown behind the login card
+let matrixRainInterval = null;
+let matrixRainCtx = null;
+let matrixRainCols = [];
+let matrixRainSpeeds = [];
+const MATRIX_FONT_SIZE = 16;
+const MATRIX_CHARS = 'アカサタナハマヤラワ0123456789ABCDEF$%#@&*+=<>{}[]/\\|अआइईउऊएऐओऔकखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसह'.split('');
+
+function setupMatrixRain() {
+  const canvas = document.getElementById('matrix-rain');
+  if (!canvas) return;
+  matrixRainCtx = canvas.getContext('2d');
+  const resize = () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const columns = Math.max(1, Math.floor(canvas.width / MATRIX_FONT_SIZE));
+    matrixRainCols = new Array(columns).fill(0).map(() => Math.random() * -100);
+    matrixRainSpeeds = new Array(columns).fill(0).map(() => 0.4 + Math.random() * 0.8);
+  };
+  window.addEventListener('resize', resize);
+  resize();
+}
+
+function drawMatrixRain() {
+  const canvas = document.getElementById('matrix-rain');
+  if (!canvas || !matrixRainCtx) return;
+  matrixRainCtx.fillStyle = 'rgba(8, 9, 13, 0.09)';
+  matrixRainCtx.fillRect(0, 0, canvas.width, canvas.height);
+  matrixRainCtx.font = MATRIX_FONT_SIZE + 'px monospace';
+  for (let i = 0; i < matrixRainCols.length; i++) {
+    const char = MATRIX_CHARS[Math.floor(Math.random() * MATRIX_CHARS.length)];
+    const y = matrixRainCols[i] * MATRIX_FONT_SIZE;
+    matrixRainCtx.fillStyle = Math.random() < 0.07 ? '#dce3ff' : 'rgba(94, 138, 255, 0.8)';
+    matrixRainCtx.fillText(char, i * MATRIX_FONT_SIZE, y);
+    if (y > canvas.height && Math.random() > 0.975) matrixRainCols[i] = 0;
+    matrixRainCols[i] += matrixRainSpeeds[i];
+  }
+}
+
+function startMatrixRain() {
+  if (matrixRainInterval || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (!matrixRainCtx) setupMatrixRain();
+  matrixRainInterval = setInterval(drawMatrixRain, 40);
+}
+
+function stopMatrixRain() {
+  if (matrixRainInterval) {
+    clearInterval(matrixRainInterval);
+    matrixRainInterval = null;
+  }
+  const canvas = document.getElementById('matrix-rain');
+  if (canvas && matrixRainCtx) matrixRainCtx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
 function showLogin(firstRun) {
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('vault-screen').classList.add('hidden');
+  document.getElementById('matrix-rain').classList.remove('dim');
+  startMatrixRain();
   const prompt = document.getElementById('login-prompt');
   const passEl = document.getElementById('master-pass');
   const confirmEl = document.getElementById('master-pass-confirm');
@@ -171,6 +227,8 @@ function showVault() {
   document.getElementById('app').classList.add('hidden');
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('vault-screen').classList.remove('hidden');
+  document.getElementById('matrix-rain').classList.add('dim');
+  startMatrixRain();
   loadSettings();
   resetAutoLockTimer();
 }

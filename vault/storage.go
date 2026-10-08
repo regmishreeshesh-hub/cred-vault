@@ -95,6 +95,7 @@ func (v *Vault) Update(id string, c Credential) bool {
 	for i, cred := range v.Data.Credentials {
 		if cred.ID == id {
 			c.ID = id
+			c.CreatedAt = cred.CreatedAt
 			v.Data.Credentials[i] = c
 			return true
 		}
